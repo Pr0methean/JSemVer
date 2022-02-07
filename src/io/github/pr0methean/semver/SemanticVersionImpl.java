@@ -219,8 +219,7 @@ record SemanticVersionImpl(
       // Strategy A4: look for a numeric part to change to 0, e.g. 1.0.1-1.1 -> 1.0.1-1.0
       for (int i = nextReleaseImpl.prereleaseVersionArray.length - 1; i >= 0; i--) {
         PrereleaseIdentifier theirIdentifier = nextReleaseImpl.prereleaseVersionArray[i];
-        if (theirIdentifier.hasNumericPart() && (theirIdentifier.numericPartAsLongBits() == 1
-            || theirIdentifier.numericPartAsLongBits() == 0)) {
+        if (theirIdentifier.hasNumericPart() && theirIdentifier.numericPartAsLongBits() != 0) {
           return nextReleaseImpl.withLastPrereleaseId(i + 1, PrereleaseIdentifier.MIN_VALUE);
         }
       }
