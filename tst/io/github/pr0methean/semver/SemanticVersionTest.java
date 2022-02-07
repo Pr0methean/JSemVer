@@ -31,24 +31,30 @@ public class SemanticVersionTest {
       "1.0.0-0a",
       "1.0.0-0a.0",
       "1.0.0-0a.1",
+      "1.0.0-0beta",
       "1.0.0-1",
       "1.0.0-1.0",
       "1.0.0-1.1",
       "1.0.0-1a",
       "1.0.0-1a.0",
       "1.0.0-1a.1",
+      "1.0.0-1b",
+      "1.0.0-2a",
       "1.0.0-9",
       "1.0.0-10",
       "1.0.0-" + MAX_VALUE,
       "1.0.0-alpha",
       "1.0.0-alpha.0",
       "1.0.0-alpha.1",
+      "1.0.0-alpha." + MAX_VALUE,
       "1.0.0-alpha.beta",
       "1.0.0-beta",
+      "1.0.0-beta.0",
       "1.0.0-beta.2",
       "1.0.0-beta.9",
       "1.0.0-beta.10",
       "1.0.0-beta.11",
+      "1.0.0-beta." + MAX_VALUE,
       "1.0.0-rc.1",
       "1.0.0",
       "1.0.1",
@@ -179,21 +185,22 @@ public class SemanticVersionTest {
 
   @Test
   public void testBuildMetadataIgnored() {
-    for (String version : TEST_VERSIONS_FOR_SORTING) {
-      SemanticVersion baseVersion = valueOf(version);
-      SemanticVersion versionWithBuildMetadata1 = valueOf(version + randomBuildMetadata());
-      SemanticVersion versionWithBuildMetadata2 = valueOf(version + randomBuildMetadata());
+    for (String baseVersionString : TEST_VERSIONS_FOR_SORTING) {
+      SemanticVersion baseVersion = valueOf(baseVersionString);
+      SemanticVersion versionWithBuildMetadata1 = valueOf(baseVersionString + randomBuildMetadata());
+      SemanticVersion versionWithBuildMetadata2 = valueOf(baseVersionString + randomBuildMetadata());
       assertNotEquals(baseVersion, versionWithBuildMetadata1, "equals shouldn't ignore build metadata");
-      assertEquals(0, baseVersion.compareTo(versionWithBuildMetadata1),
-          "compareTo should ignore build metadata");
-      assertNotEquals(versionWithBuildMetadata1, versionWithBuildMetadata2,
-          "equals shouldn't ignore build metadata");
-      assertEquals(0, versionWithBuildMetadata1.compareTo(versionWithBuildMetadata2),
-          "compareTo should ignore build metadata");
-      assertNotEquals(0, TOTAL_ORDERING.compare(versionWithBuildMetadata1, versionWithBuildMetadata2),
-          "TOTAL_ORDERING shouldn't ignore build metadata");
-      assertNotEquals(0, TOTAL_ORDERING.compare(baseVersion, versionWithBuildMetadata1),
-          "TOTAL_ORDERING shouldn't ignore build metadata");
+      assertEquals(0, BUILD_METADATA_AGNOSTIC_COMPARATOR.compare(baseVersion, versionWithBuildMetadata1),
+          "BUILD_METADATA_AGNOSTIC_COMPARATOR should treat these as equal");
+      assertEquals(0,
+              BUILD_METADATA_AGNOSTIC_COMPARATOR.compare(versionWithBuildMetadata1, versionWithBuildMetadata2),
+              "BUILD_METADATA_AGNOSTIC_COMPARATOR should treat these as equal");
+      assertNotEquals(0, baseVersion.compareTo(versionWithBuildMetadata1),
+          "compareTo shouldn't ignore build metadata");
+      assertNotEquals(0, versionWithBuildMetadata1.compareTo(versionWithBuildMetadata2),
+              "compareTo shouldn't ignore build metadata");
+      assertTrue(TOTAL_ORDERING.compare(baseVersion, versionWithBuildMetadata1) < 0,
+          "compareTo should put version without build metadata first");
     }
   }
 
@@ -208,9 +215,10 @@ public class SemanticVersionTest {
   @Test
   public void testNextPrerelease() {
     for (int i = 0; i < TEST_VERSIONS_FOR_SORTING.length - 1; i++) {
+      String currentVersionString = TEST_VERSIONS_FOR_SORTING[i];
+      SemanticVersion currentVersion = valueOf(currentVersionString);
+      assertThrows(IllegalArgumentException.class, () -> currentVersion.nextPrereleaseBefore(currentVersion));
       for (int j = i + 1; j < TEST_VERSIONS_FOR_SORTING.length; j++) {
-        String currentVersionString = TEST_VERSIONS_FOR_SORTING[i];
-        SemanticVersion currentVersion = valueOf(currentVersionString);
         String nextReleaseString = TEST_VERSIONS_FOR_SORTING[j];
         SemanticVersion nextRelease = valueOf(nextReleaseString);
         if (currentVersion.isPrerelease()) {
@@ -227,6 +235,10 @@ public class SemanticVersionTest {
   }
 
   private Optional<SemanticVersion> checkedVersionBetween(SemanticVersion currentVersion, SemanticVersion nextRelease) {
+    if (currentVersion.compareTo(nextRelease) >= 0) {
+      assertThrows(IllegalArgumentException.class, () -> currentVersion.nextPrereleaseBefore(nextRelease));
+      return Optional.empty();
+    }
     String currentVersionString = currentVersion.toString();
     String nextPossibleVersion = currentVersionString +
         (currentVersionString.contains("-") ? ".0" : "-0");
@@ -236,8 +248,9 @@ public class SemanticVersionTest {
     }
     SemanticVersion between = currentVersion.nextPrereleaseBefore(nextRelease);
     assertIsPrerelease(between);
-    assertTrue(currentVersion.compareTo(between) < 0);
-    assertTrue(between.compareTo(nextRelease) < 0);
+    assertEquals(between.releaseVersion(), nextRelease.releaseVersion());
+    assertTrue(currentVersion.compareTo(between) < 0, "Expected " + currentVersion + " < " + between);
+    assertTrue(between.compareTo(nextRelease) < 0, "Expected " + between + " < " + nextRelease);
     int expectedMaxLength = Math.max(nextPossibleVersion.length(), nextRelease.toString().length());
     assertTrue(between.toString().length() <= expectedMaxLength,
         between + " (between " + currentVersion + " and " + nextRelease + ") shouldn't be longer than both "
@@ -315,7 +328,8 @@ public class SemanticVersionTest {
           assertEquals(major, releaseVersionPlusMetadata.majorVersion());
           assertEquals(minor, releaseVersionPlusMetadata.minorVersion());
           assertEquals(patch, releaseVersionPlusMetadata.patchVersion());
-          assertEquals(0, releaseVersion.compareTo(releaseVersionPlusMetadata));
+          assertTrue(releaseVersion.compareTo(releaseVersionPlusMetadata) < 0,
+                  "Version without build metadata should come first");
           assertNotPrerelease(releaseVersionPlusMetadata);
           assertNotEquals(0, TOTAL_ORDERING.compare(releaseVersion, releaseVersionPlusMetadata));
           List<String> prereleaseIds = List.of(randomIdentifier());
@@ -395,11 +409,11 @@ public class SemanticVersionTest {
       List<String> prerelease) {
     SemanticVersion mock = Mockito.mock(SemanticVersion.class);
     when (mock.majorVersion()).thenReturn(major);
-    when (mock.majorVersionUnsignedUnboxed()).thenReturn(major.longValue());
+    when (mock.majorVersionAsLongBits()).thenReturn(major.longValue());
     when (mock.minorVersion()).thenReturn(minor);
-    when (mock.minorVersionUnsignedUnboxed()).thenReturn(minor.longValue());
+    when (mock.minorVersionAsLongBits()).thenReturn(minor.longValue());
     when (mock.patchVersion()).thenReturn(patch);
-    when (mock.patchVersionUnsignedUnboxed()).thenReturn(patch.longValue());
+    when (mock.patchVersionAsLongBits()).thenReturn(patch.longValue());
     when (mock.isPrerelease()).thenReturn(prerelease != null);
     when (mock.prereleaseVersion()).thenReturn(prerelease);
     when (mock.compareTo(any(SemanticVersion.class))).thenCallRealMethod();

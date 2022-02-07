@@ -30,10 +30,10 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
    * partition rather than a total ordering ({@code a.equals(b)} implies {@code a.compareTo(b) == 0} but not
    * vice-versa). See {@link #TOTAL_ORDERING} for an ordering that distinguishes versions with different build metadata.
    */
-  Comparator<SemanticVersion> STANDARD_COMPARATOR
-      = comparingUnsignedLong(SemanticVersion::majorVersionUnsignedUnboxed)
-      .thenComparing(comparingUnsignedLong(SemanticVersion::minorVersionUnsignedUnboxed))
-      .thenComparing(comparingUnsignedLong(SemanticVersion::patchVersionUnsignedUnboxed))
+  Comparator<SemanticVersion> BUILD_METADATA_AGNOSTIC_COMPARATOR
+          = comparingUnsignedLong(SemanticVersion::majorVersionAsLongBits)
+      .thenComparing(comparingUnsignedLong(SemanticVersion::minorVersionAsLongBits))
+      .thenComparing(comparingUnsignedLong(SemanticVersion::patchVersionAsLongBits))
       .thenComparing(SemanticVersion::comparePrereleaseVersions);
 
   /**
@@ -41,7 +41,7 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
    * instances are unequal, then one of them is greater according to this ordering.
    */
   Comparator<SemanticVersion> TOTAL_ORDERING
-          = STANDARD_COMPARATOR.thenComparing(SemanticVersion::buildMetadata, nullsFirst(naturalOrder()));
+          = BUILD_METADATA_AGNOSTIC_COMPARATOR.thenComparing(SemanticVersion::buildMetadata, nullsFirst(naturalOrder()));
   @SuppressWarnings({"UnstableApiUsage"})
   Comparator<Iterable<String>> COMPARATOR_FOR_UNKNOWN_PRERELEASE_IDENTIFIER_IMPLS
       = Comparators.lexicographical(comparing(PrereleaseIdentifier::valueOf));
@@ -152,14 +152,11 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
    */
   boolean isPrerelease();
 
-  /**
-   * {@inheritDoc}
-   *
-   * @see #STANDARD_COMPARATOR for an important caveat.
-   */
   @Override
   default int compareTo(@Nonnull SemanticVersion other) {
-    return STANDARD_COMPARATOR.compare(this, other);
+    // Comparable's Javadoc recommends that the natural ordering be a total ordering when possible.
+    // This helps e.g. ensure O(log n) behavior on a treeified HashMap<SemanticVersion,?> bucket with adversarial input.
+    return TOTAL_ORDERING.compare(this, other);
   }
 
   SemanticVersion clone();
@@ -167,17 +164,17 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
   /**
    * Equivalent to {@link #majorVersion()}{@code .longValue()} but may avoid boxing and unboxing.
    */
-  long majorVersionUnsignedUnboxed();
+  long majorVersionAsLongBits();
 
   /**
    * Equivalent to {@link #minorVersion()}{@code .longValue()} but may avoid boxing and unboxing.
    */
-  long minorVersionUnsignedUnboxed();
+  long minorVersionAsLongBits();
 
   /**
    * Equivalent to {@link #patchVersion()}{@code .longValue()} but may avoid boxing and unboxing.
    */
-  long patchVersionUnsignedUnboxed();
+  long patchVersionAsLongBits();
 
   @Nullable String buildMetadata();
 
@@ -201,21 +198,21 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
    * @return the major version of this semantic version (e.g. returns 1 for version 1.2.0)
    */
   default UnsignedLong majorVersion() {
-    return fromLongBits(majorVersionUnsignedUnboxed());
+    return fromLongBits(majorVersionAsLongBits());
   }
 
   /**
    * @return the minor version of this semantic version (e.g. returns 2 for version 1.2.0)
    */
   default UnsignedLong minorVersion() {
-    return fromLongBits(minorVersionUnsignedUnboxed());
+    return fromLongBits(minorVersionAsLongBits());
   }
 
   /**
    * @return the patch version of this semantic version (e.g. returns 0 for version 1.2.0)
    */
   default UnsignedLong patchVersion() {
-    return fromLongBits(patchVersionUnsignedUnboxed());
+    return fromLongBits(patchVersionAsLongBits());
   }
 
   /**

@@ -15,15 +15,16 @@ import java.util.stream.Stream;
  * Represents a semantic version complying with https://semver.org/spec/v1.0.0.html.
  */
 record SemanticVersionImpl(
-        long majorVersionUnsignedUnboxed,
-        long minorVersionUnsignedUnboxed,
-        long patchVersionUnsignedUnboxed,
-        @Nullable PrereleaseIdentifier[] prereleaseVersionArray,
-        @Nullable String buildMetadata)
+    long majorVersionAsLongBits,
+    long minorVersionAsLongBits,
+    long patchVersionAsLongBits,
+    @Nullable PrereleaseIdentifier[] prereleaseVersionArray,
+    @Nullable String buildMetadata)
     implements SemanticVersion {
   public static final PrereleaseIdentifier FIRST_PRERELEASE = new PrereleaseIdentifier(true, 1, "");
   private static final PrereleaseIdentifier[] DEFAULT_FIRST_PRERELEASE_ARRAY
       = {FIRST_PRERELEASE};
+  private static final PrereleaseIdentifier[] MIN_VALUE_PRERELEASE_ARRAY = {PrereleaseIdentifier.MIN_VALUE};
 
   /**
    * Equivalent to {@code comparing(keyExtractor, UnsignedLongs::compare)} without the autoboxing.
@@ -45,6 +46,13 @@ record SemanticVersionImpl(
     return (result.length == 0) ? null : result;
   }
 
+  private SemanticVersion withLastPrereleaseId(int newLength, PrereleaseIdentifier finalPrereleaseId) {
+    PrereleaseIdentifier[] prereleaseIdentifiers = Arrays.copyOf(prereleaseVersionArray,
+        newLength);
+    prereleaseIdentifiers[newLength - 1] = finalPrereleaseId;
+    return prereleaseWithIdentifiers(prereleaseIdentifiers);
+  }
+
   @Override
   public boolean isPrerelease() {
     return prereleaseVersionArray != null;
@@ -53,9 +61,9 @@ record SemanticVersionImpl(
   @SuppressWarnings("UnstableApiUsage")
   @Override
   public String toString() {
-    StringBuilder out = new StringBuilder(UnsignedLongs.toString(majorVersionUnsignedUnboxed)).append('.')
-        .append(UnsignedLongs.toString(minorVersionUnsignedUnboxed)).append('.')
-        .append(UnsignedLongs.toString(patchVersionUnsignedUnboxed));
+    StringBuilder out = new StringBuilder(UnsignedLongs.toString(majorVersionAsLongBits)).append('.')
+        .append(UnsignedLongs.toString(minorVersionAsLongBits)).append('.')
+        .append(UnsignedLongs.toString(patchVersionAsLongBits));
     if (prereleaseVersionArray != null) {
       out.append('-');
       boolean first = true;
@@ -102,8 +110,8 @@ record SemanticVersionImpl(
         buildMetadata = null;
       }
     }
-    return new SemanticVersionImpl(majorVersionUnsignedUnboxed, minorVersionUnsignedUnboxed,
-        patchVersionUnsignedUnboxed, prereleaseVersionArray, buildMetadata);
+    return new SemanticVersionImpl(majorVersionAsLongBits, minorVersionAsLongBits,
+        patchVersionAsLongBits, prereleaseVersionArray, buildMetadata);
   }
 
   @Override
@@ -125,25 +133,25 @@ record SemanticVersionImpl(
 
   @Override
   public SemanticVersion nextMajorRelease() {
-    if (isPrerelease() && minorVersionUnsignedUnboxed == 0 && patchVersionUnsignedUnboxed == 0) {
+    if (isPrerelease() && minorVersionAsLongBits == 0 && patchVersionAsLongBits == 0) {
       return releaseVersion();
     }
-    if (majorVersionUnsignedUnboxed == SemanticVersion.UNSIGNED_MAX_VALUE_UNBOXED) {
+    if (majorVersionAsLongBits == SemanticVersion.UNSIGNED_MAX_VALUE_UNBOXED) {
       throw new IllegalArgumentException("Major version would overflow a long treated as unsigned");
     }
-    return new SemanticVersionImpl(majorVersionUnsignedUnboxed + 1, 0, 0,
+    return new SemanticVersionImpl(majorVersionAsLongBits + 1, 0, 0,
         null, null);
   }
 
   @Override
   public SemanticVersion nextMinorRelease() {
-    if (isPrerelease() && patchVersionUnsignedUnboxed == 0) {
+    if (isPrerelease() && patchVersionAsLongBits == 0) {
       return releaseVersion();
     }
-    if (minorVersionUnsignedUnboxed == SemanticVersion.UNSIGNED_MAX_VALUE_UNBOXED) {
+    if (minorVersionAsLongBits == SemanticVersion.UNSIGNED_MAX_VALUE_UNBOXED) {
       throw new IllegalArgumentException("Minor version would overflow a long treated as unsigned");
     }
-    return new SemanticVersionImpl(majorVersionUnsignedUnboxed, minorVersionUnsignedUnboxed + 1, 0,
+    return new SemanticVersionImpl(majorVersionAsLongBits, minorVersionAsLongBits + 1, 0,
         null, null);
   }
 
@@ -152,24 +160,23 @@ record SemanticVersionImpl(
     if (isPrerelease()) {
       return releaseVersion();
     }
-    if (patchVersionUnsignedUnboxed == SemanticVersion.UNSIGNED_MAX_VALUE_UNBOXED) {
+    if (patchVersionAsLongBits == SemanticVersion.UNSIGNED_MAX_VALUE_UNBOXED) {
       throw new IllegalArgumentException("Patch version would overflow a long treated as unsigned");
     }
-    return new SemanticVersionImpl(majorVersionUnsignedUnboxed, minorVersionUnsignedUnboxed,
-        patchVersionUnsignedUnboxed + 1, null, null);
+    return new SemanticVersionImpl(majorVersionAsLongBits, minorVersionAsLongBits,
+        patchVersionAsLongBits + 1, null, null);
   }
 
   private SemanticVersionImpl prereleaseWithIdentifiers(PrereleaseIdentifier[] identifiers) {
     return new SemanticVersionImpl(
-        majorVersionUnsignedUnboxed,
-        minorVersionUnsignedUnboxed,
-        patchVersionUnsignedUnboxed,
+        majorVersionAsLongBits,
+        minorVersionAsLongBits,
+        patchVersionAsLongBits,
         identifiers,
         null
     );
   }
 
-  @Override
   public SemanticVersion nextPrereleaseBefore(@Nullable SemanticVersion nextRelease) {
     if (nextRelease == null) {
       if (!isPrerelease()) {
@@ -177,147 +184,214 @@ record SemanticVersionImpl(
             + this + " isn't a prerelease");
       }
       nextRelease = releaseVersion();
+    } else if (BUILD_METADATA_AGNOSTIC_COMPARATOR.compare(this, nextRelease) >= 0) {
+      throw new IllegalArgumentException(this + " is equivalent to or ahead of " + nextRelease);
     }
     SemanticVersionImpl nextReleaseImpl = (SemanticVersionImpl) ((nextRelease instanceof SemanticVersionImpl)
         ? nextRelease
         : SemanticVersion.valueOf(nextRelease.toString()));
-    if (isPrerelease()) {
-      SemanticVersion thisWithLastNumberIncremented = null;
-      boolean finished = false;
-      // First pass: look for a non-maximal numeric part and increment it
-      for (int i = prereleaseVersionArray.length - 1; i >= 0; i--) {
-        if (prereleaseVersionArray[i].hasNumericPart() &&
-            prereleaseVersionArray[i].numericPartUnsignedUnboxed() != SemanticVersion.UNSIGNED_MAX_VALUE_UNBOXED) {
-          PrereleaseIdentifier[] prereleaseIdentifiers = Arrays.copyOf(prereleaseVersionArray,
-              i + 1);
-          prereleaseIdentifiers[i] = new PrereleaseIdentifier(true,
-              prereleaseVersionArray[i].numericPartUnsignedUnboxed() +
-                  1,
-              prereleaseVersionArray[i].suffix());
-          thisWithLastNumberIncremented = prereleaseWithIdentifiers(prereleaseIdentifiers);
-          finished = true;
-          break;
-        }
+    if (!releaseVersion().equals(nextReleaseImpl.releaseVersion())) {
+      // Branch A: we're not a prerelease of nextReleaseImpl.releaseVersion()
+      // Output an earlier prerelease of nextReleaseImpl.releaseVersion()
+
+      // Strategy A1: return the default first prerelease of a non-prerelease nextReleaseImpl
+      if (!nextReleaseImpl.isPrerelease()) {
+        return nextReleaseImpl.prereleaseWithIdentifiers(DEFAULT_FIRST_PRERELEASE_ARRAY);
       }
-      if (!finished) {
-        // Try an extension
-        thisWithLastNumberIncremented =
-            withLastPrereleaseId(this, prereleaseVersionArray.length + 1, FIRST_PRERELEASE);
+
+      // Strategy A2: fail fast if nextReleaseImpl is already the lowest possible prerelease identifier for its
+      // release version
+      if (Arrays.equals(nextReleaseImpl.prereleaseVersionArray, MIN_VALUE_PRERELEASE_ARRAY)) {
+        throw new IllegalArgumentException(nextReleaseImpl + " is already the first possible prerelease of "
+            + nextReleaseImpl.releaseVersion());
       }
-      if (compareTo(thisWithLastNumberIncremented) < 0 && thisWithLastNumberIncremented.compareTo(nextReleaseImpl) < 0) {
-        return thisWithLastNumberIncremented;
-      }
-    }
-    SemanticVersion nextWithLastNumberDecremented = null;
-    if (!nextReleaseImpl.isPrerelease()) {
-      nextWithLastNumberDecremented = nextReleaseImpl.prereleaseWithIdentifiers(DEFAULT_FIRST_PRERELEASE_ARRAY);
-    } else {
-      // Second pass: look for a positive numeric part and decrement it or remove the suffix
-      boolean finished = false;
+
+      // Strategy A3: look for a numeric part to change to 1, e.g. 1.0.1-alpha.5a.bravo -> 1.0.1-alpha.1a
       for (int i = nextReleaseImpl.prereleaseVersionArray.length - 1; i >= 0; i--) {
-        if (nextReleaseImpl.prereleaseVersionArray[i].hasNumericPart() &&
-            nextReleaseImpl.prereleaseVersionArray[i].numericPartUnsignedUnboxed() != 0) {
-          nextWithLastNumberDecremented = withLastPrereleaseId(nextReleaseImpl, i + 1,
-              new PrereleaseIdentifier(true,
-                  nextReleaseImpl.prereleaseVersionArray[i].numericPartUnsignedUnboxed() +
-                      (nextReleaseImpl.prereleaseVersionArray[i].suffix().isEmpty() ? -1 : 0),
-                  ""));
-          finished = true;
-          break;
+        PrereleaseIdentifier theirIdentifier = nextReleaseImpl.prereleaseVersionArray[i];
+        if (theirIdentifier.hasNumericPart() && theirIdentifier.numericPartAsLongBits() != 0
+            && theirIdentifier.numericPartAsLongBits() != 1) {
+          return nextReleaseImpl.withLastPrereleaseId(i + 1,
+              FIRST_PRERELEASE);
         }
       }
-      if (!finished) {
-        // Third pass: try replacing a non-numeric identifier with "1"
-        for (int i = nextReleaseImpl.prereleaseVersionArray.length - 1; i >= 0; i--) {
-          if (!nextReleaseImpl.prereleaseVersionArray[i].hasNumericPart()) {
-            nextWithLastNumberDecremented = SemanticVersionImpl.withLastPrereleaseId(nextReleaseImpl, i + 1, FIRST_PRERELEASE);
-            finished = true;
-            break;
-          }
-        }
-        if (!finished) {
-          // Try a prefix
-          PrereleaseIdentifier[] prereleaseIdentifiers = Arrays.copyOf(nextReleaseImpl.prereleaseVersionArray,
-              nextReleaseImpl.prereleaseVersionArray.length - 1);
 
-          nextWithLastNumberDecremented = nextReleaseImpl.prereleaseWithIdentifiers(prereleaseIdentifiers);
+      // Strategy A4: look for a numeric part to change to 0, e.g. 1.0.1-1.1 -> 1.0.1-1.0
+      for (int i = nextReleaseImpl.prereleaseVersionArray.length - 1; i >= 0; i--) {
+        PrereleaseIdentifier theirIdentifier = nextReleaseImpl.prereleaseVersionArray[i];
+        if (theirIdentifier.hasNumericPart() && (theirIdentifier.numericPartAsLongBits() == 1
+            || theirIdentifier.numericPartAsLongBits() == 0)) {
+          return nextReleaseImpl.withLastPrereleaseId(i + 1, PrereleaseIdentifier.MIN_VALUE);
         }
       }
-    }
-    if (compareTo(nextWithLastNumberDecremented) < 0 && nextWithLastNumberDecremented.compareTo(nextReleaseImpl) < 0) {
-      return nextWithLastNumberDecremented;
-    }
-    SemanticVersion thisExtended = null;
-    if (!isPrerelease()) {
-      thisExtended = nextPrereleaseBefore(nextPatchRelease());
-    } else {
-      // Fourth pass: try an extension of a prefix
-      boolean finished1 = false;
-      for (int i = prereleaseVersionArray.length - 1; i >= 0; i--) {
-        if (prereleaseVersionArray[i].hasNumericPart() &&
-            prereleaseVersionArray[i].numericPartUnsignedUnboxed() != SemanticVersion.UNSIGNED_MAX_VALUE_UNBOXED) {
-          thisExtended = withLastPrereleaseId(this, i + 1, new PrereleaseIdentifier(
-              true, prereleaseVersionArray[i].numericPartUnsignedUnboxed() + 1, ""));
-          finished1 = true;
-          break;
-        }
-      }
-      if (!finished1) {
-        // Fifth pass: try a non-numeric identifier followed by "1"
-        for (int i = prereleaseVersionArray.length - 1; i >= 0; i--) {
-          if (!prereleaseVersionArray[i].hasNumericPart()) {
-            thisExtended = withLastPrereleaseId(this, i + 2, FIRST_PRERELEASE);
-            break;
-          }
-        }
-      }
-    }
-    if (thisExtended != null && compareTo(thisExtended) < 0 && thisExtended.compareTo(nextReleaseImpl) < 0) {
-      return thisExtended;
-    }
-    SemanticVersion lowerBoundExtendingWithZero = null;
-    if (!isPrerelease()) {
-      lowerBoundExtendingWithZero = nextPrereleaseBefore(nextPatchRelease());
-    } else {
-      // Sixth pass: look for a positive numeric part and extend it
-      boolean finished3 = false;
-      for (int i = prereleaseVersionArray.length - 1; i >= 0; i--) {
-        if (prereleaseVersionArray[i].hasNumericPart() &&
-            prereleaseVersionArray[i].numericPartUnsignedUnboxed() != SemanticVersion.UNSIGNED_MAX_VALUE_UNBOXED) {
-          lowerBoundExtendingWithZero =
-              withLastPrereleaseId(this,
-                  i + 2, PrereleaseIdentifier.MIN_VALUE);
-          finished3 = true;
-          break;
-        }
-      }
-      if (!finished3) {
-        // Seventh pass: try replacing/extending a non-numeric identifier with "0"
-        for (int i = prereleaseVersionArray.length - 1; i >= 0; i--) {
-          if (!prereleaseVersionArray[i].hasNumericPart()) {
-            lowerBoundExtendingWithZero = withLastPrereleaseId(this, i + 2, PrereleaseIdentifier.MIN_VALUE);
-            break;
-          }
-        }
-      }
-    }
-    if (lowerBoundExtendingWithZero != null
-        && compareTo(lowerBoundExtendingWithZero) < 0 && lowerBoundExtendingWithZero.compareTo(nextReleaseImpl) < 0) {
-      return lowerBoundExtendingWithZero;
-    }
-    throw new IllegalArgumentException("Can't find a prerelease between " + this + " and " + nextRelease);
-  }
 
-  private static SemanticVersion withLastPrereleaseId(SemanticVersionImpl semanticVersion,
-      int newLength, PrereleaseIdentifier finalPrereleaseId) {
-    PrereleaseIdentifier[] prereleaseIdentifiers = Arrays.copyOf(semanticVersion.prereleaseVersionArray,
-        newLength);
-    prereleaseIdentifiers[newLength - 1] = finalPrereleaseId;
-    return semanticVersion.prereleaseWithIdentifiers(prereleaseIdentifiers);
+      // Strategy A5: look for a suffix that comes after a numeric part to truncate, e.g. 1.0.1-1a -> 1.0.1-1
+      for (int i = nextReleaseImpl.prereleaseVersionArray.length - 1; i >= 0; i--) {
+        PrereleaseIdentifier theirIdentifier = nextReleaseImpl.prereleaseVersionArray[i];
+        if (theirIdentifier.hasNumericPart() && !(theirIdentifier.suffix().isEmpty())) {
+          return nextReleaseImpl.withLastPrereleaseId(i + 1,
+              new PrereleaseIdentifier(true, theirIdentifier.numericPartAsLongBits(), ""));
+        }
+      }
+
+      // Strategy A6: replace a prerelease identifier with "0"
+      for (int i = nextReleaseImpl.prereleaseVersionArray.length - 1; i >= 0; i--) {
+        PrereleaseIdentifier theirIdentifier = nextReleaseImpl.prereleaseVersionArray[i];
+        if (theirIdentifier.compareTo(PrereleaseIdentifier.MIN_VALUE) > 0) {
+          return nextReleaseImpl.withLastPrereleaseId(i + 1,
+              PrereleaseIdentifier.MIN_VALUE);
+        }
+      }
+
+      // Strategy A7: truncate a prerelease identifier (infallible)
+      return nextReleaseImpl.prereleaseWithIdentifiers(Arrays.copyOf(nextReleaseImpl.prereleaseVersionArray,
+          nextReleaseImpl.prereleaseVersionArray.length - 1));
+    }
+    // if we've gotten this far, we're a prerelease of nextReleaseImpl.releaseVersion()
+
+    /* Sanity check
+    if (!isPrerelease()) {
+      throw new AssertionError("Couldn't calculate next prerelease between " + this
+          + " and " + nextReleaseImpl + " (assertion 2)");
+    }
+     */
+
+    if (!nextReleaseImpl.isPrerelease()) {
+      // Branch B: We're a prerelease of nextReleaseImpl, which is a release version
+
+      // Strategy B1: Find a numerical identifier to increment
+      for (int i = prereleaseVersionArray.length - 1; i >= 0; i--) {
+        PrereleaseIdentifier ourIdentifier = prereleaseVersionArray[i];
+        if (ourIdentifier.hasNumericPart() && ourIdentifier.numericPartAsLongBits() != UNSIGNED_MAX_VALUE_UNBOXED) {
+          PrereleaseIdentifier incremented = new PrereleaseIdentifier(true,
+              ourIdentifier.numericPartAsLongBits() + 1, ourIdentifier.suffix());
+          PrereleaseIdentifier[] ourIdentifiersWithIncrement = Arrays.copyOf(prereleaseVersionArray, i + 1);
+          ourIdentifiersWithIncrement[i] = incremented;
+          return nextReleaseImpl.prereleaseWithIdentifiers(ourIdentifiersWithIncrement);
+        }
+      }
+
+      // Strategy B2: Concatenate ".1" (infallible)
+      return withLastPrereleaseId(prereleaseVersionArray.length + 1, FIRST_PRERELEASE);
+    }
+
+    // Branches C & up: we're both prereleases of the same version
+    final int shorterLength = Math.min(prereleaseVersionArray.length, nextReleaseImpl.prereleaseVersionArray.length);
+    final int firstDifference = Arrays.mismatch(prereleaseVersionArray, nextReleaseImpl.prereleaseVersionArray);
+
+    /* Sanity check
+    if (firstDifference == -1) {
+      throw new AssertionError("Couldn't calculate next prerelease between " + this
+          + " and " + nextReleaseImpl + " (assertion 3)");
+    }
+     */
+
+    PrereleaseIdentifier theirIdentifier = nextReleaseImpl.prereleaseVersionArray[firstDifference];
+
+    if (prereleaseVersionArray.length <= firstDifference) {
+      // Branch C: we're a prefix of nextReleaseImpl
+
+      // Strategy C1: If we're a prefix of their version, find a numeric part greater than 1 and replace it with 1
+      // e.g. 1.0.1-0alpha.1 as between 1.0.1-0alpha and 1.0.1-0alpha.27
+      if (theirIdentifier.hasNumericPart() && theirIdentifier.numericPartAsLongBits() != 0
+          && theirIdentifier.numericPartAsLongBits() != 1) {
+        return nextReleaseImpl.withLastPrereleaseId(firstDifference + 1,
+            new PrereleaseIdentifier(true, 1, theirIdentifier.suffix()));
+      }
+      // Strategy C2: If we're a prefix of their version with more than one identifier that they have and we don't, and
+      // they don't have any numeric parts after us, then try using the next-shortest prefix
+      if (nextReleaseImpl.prereleaseVersionArray.length >= firstDifference + 2) {
+        return nextReleaseImpl.prereleaseWithIdentifiers(
+            Arrays.copyOf(nextReleaseImpl.prereleaseVersionArray, prereleaseVersionArray.length + 1));
+      }
+      // Strategy C3: fail if nextReleaseImpl is this + ".0"
+      if (nextReleaseImpl.prereleaseVersionArray[firstDifference].equals(PrereleaseIdentifier.MIN_VALUE)) {
+        throw new IllegalArgumentException(this + " is already the last possible version before " + nextReleaseImpl);
+      }
+      // Strategy C4: return this + ".0" (infallible)
+      return withLastPrereleaseId(prereleaseVersionArray.length + 1, PrereleaseIdentifier.MIN_VALUE);
+    }
+
+    // Branches D & up: we're both prereleases of the same version,
+    // but we differ within the first shorterLength prerelease identifiers
+
+    PrereleaseIdentifier ourIdentifier = prereleaseVersionArray[firstDifference];
+
+    if (theirIdentifier.hasNumericPart() && ourIdentifier.hasNumericPart()) {
+      // Branch D: On the first identifier where we differ, we both have a numeric part
+
+      long difference = theirIdentifier.numericPartAsLongBits() - ourIdentifier.numericPartAsLongBits();
+      if (difference >= 2) {
+        // Strategy D1: Find an identifier on which we both have a numeric part and differ by at least 2
+        // e.g. 1.0.1-1alpha as between 1.0.1-0alpha and 1.0.1-2*
+        PrereleaseIdentifier[] newPrereleaseVersion = Arrays.copyOf(prereleaseVersionArray, firstDifference + 1);
+        newPrereleaseVersion[firstDifference] = new PrereleaseIdentifier(true,
+            ourIdentifier.numericPartAsLongBits() + 1, ourIdentifier.suffix());
+        return prereleaseWithIdentifiers(newPrereleaseVersion);
+      } else if (difference == 1) {
+        // Strategy D2: Find an identifier with a numeric part on which we differ by 1 and their suffix is greater than
+        // ours
+        // e.g. 1.0.1-1alpha as between 1.0.1-0alpha and 1.0.1-1beta
+        PrereleaseIdentifier incremented = new PrereleaseIdentifier(true, ourIdentifier.numericPartAsLongBits() + 1,
+            ourIdentifier.suffix());
+        if (incremented.compareTo(theirIdentifier) < 0) {
+          return withLastPrereleaseId(firstDifference + 1, incremented);
+        }
+
+        // Strategy D3: Find an identifier with a numeric part on which we differ by 1 and they have a suffix we can
+        // chop off and replace with ".1"
+        // e.g. 1.0.1-1 as between 1.0.1-0 and 1.0.1-1a
+        if (!theirIdentifier.suffix().isEmpty()) {
+          PrereleaseIdentifier incrementedWithoutSuffix
+              = new PrereleaseIdentifier(true, theirIdentifier.numericPartAsLongBits(), "");
+          PrereleaseIdentifier[] newPrereleaseVersion = Arrays.copyOf(prereleaseVersionArray, firstDifference + 2);
+          newPrereleaseVersion[firstDifference] = incrementedWithoutSuffix;
+          newPrereleaseVersion[firstDifference + 1] = FIRST_PRERELEASE;
+          return prereleaseWithIdentifiers(newPrereleaseVersion);
+        }
+
+        // Strategy D4: Append ".1" to this (infallible)
+        // e.g. 1.0.1-alpha0.1 as between 1.0.1-alpha0 and 1.0.1-alpha1
+        return withLastPrereleaseId(prereleaseVersionArray.length + 1, FIRST_PRERELEASE);
+      }
+    }
+
+    // Branch E: our first difference is in a suffix
+    // Strategy E1: Find a number we can change to 1
+
+    for (int i = shorterLength - 1; i > firstDifference; i--) {
+      PrereleaseIdentifier theirNumIdentifier = nextReleaseImpl.prereleaseVersionArray[i];
+      if (theirNumIdentifier.hasNumericPart() && theirNumIdentifier.numericPartAsLongBits() != 0
+          && theirNumIdentifier.numericPartAsLongBits() != 1) {
+        return nextReleaseImpl.withLastPrereleaseId(i + 1, new PrereleaseIdentifier(true,
+            1, theirNumIdentifier.suffix()));
+      }
+    }
+
+    // Strategy E2: Find a number we can change to 0
+    for (int i = shorterLength - 1; i > firstDifference; i--) {
+      PrereleaseIdentifier theirNumIdentifier = nextReleaseImpl.prereleaseVersionArray[i];
+      if (theirNumIdentifier.hasNumericPart() && theirNumIdentifier.numericPartAsLongBits() != 0) {
+        return nextReleaseImpl.withLastPrereleaseId(i + 1, new PrereleaseIdentifier(true,
+            0, theirNumIdentifier.suffix()));
+      }
+    }
+
+    // Strategy E3: Find a number on our side we can increment
+    for (int i = prereleaseVersionArray.length - 1; i > firstDifference; i--) {
+      PrereleaseIdentifier ourNumIdentifier = prereleaseVersionArray[i];
+      if (ourNumIdentifier.hasNumericPart() && ourNumIdentifier.numericPartAsLongBits() != UNSIGNED_MAX_VALUE_UNBOXED) {
+        return withLastPrereleaseId(i + 1, new PrereleaseIdentifier(true,
+            ourNumIdentifier.numericPartAsLongBits() + 1, ourNumIdentifier.suffix()));
+      }
+    }
+
+    // Strategy E4: Append ".1" to this (infallible since we already differ in our existing parts)
+    return withLastPrereleaseId(prereleaseVersionArray.length + 1, FIRST_PRERELEASE);
   }
 
   @Override
-  public boolean equals(Object o) {
+  public boolean equals (Object o){
     if (this == o) {
       return true;
     }
@@ -325,22 +399,22 @@ record SemanticVersionImpl(
       return false;
     }
     if (o instanceof SemanticVersionImpl thatImpl) {
-      return majorVersionUnsignedUnboxed == thatImpl.majorVersionUnsignedUnboxed &&
-          minorVersionUnsignedUnboxed == thatImpl.minorVersionUnsignedUnboxed &&
-          patchVersionUnsignedUnboxed == thatImpl.patchVersionUnsignedUnboxed &&
+      return majorVersionAsLongBits == thatImpl.majorVersionAsLongBits &&
+          minorVersionAsLongBits == thatImpl.minorVersionAsLongBits &&
+          patchVersionAsLongBits == thatImpl.patchVersionAsLongBits &&
           Arrays.equals(prereleaseVersionArray, thatImpl.prereleaseVersionArray) &&
           Objects.equals(buildMetadata, thatImpl.buildMetadata);
     }
-    return majorVersionUnsignedUnboxed == that.majorVersionUnsignedUnboxed() &&
-        minorVersionUnsignedUnboxed == that.minorVersionUnsignedUnboxed() &&
-        patchVersionUnsignedUnboxed == that.patchVersionUnsignedUnboxed() &&
+    return majorVersionAsLongBits == that.majorVersionAsLongBits() &&
+        minorVersionAsLongBits == that.minorVersionAsLongBits() &&
+        patchVersionAsLongBits == that.patchVersionAsLongBits() &&
         Objects.equals(prereleaseVersion(), that.prereleaseVersion()) &&
         Objects.equals(buildMetadata, that.buildMetadata());
   }
 
   @Override
-  public int hashCode() {
-    int result = Objects.hash(majorVersionUnsignedUnboxed, minorVersionUnsignedUnboxed, patchVersionUnsignedUnboxed,
+  public int hashCode () {
+    int result = Objects.hash(majorVersionAsLongBits, minorVersionAsLongBits, patchVersionAsLongBits,
         buildMetadata);
     result = 31 * result + Arrays.hashCode(prereleaseVersionArray);
     return result;

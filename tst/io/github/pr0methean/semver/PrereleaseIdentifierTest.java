@@ -16,6 +16,7 @@ class PrereleaseIdentifierTest {
     TestUtil.verifySortOrder(true, Arrays.stream(CHUNK_STRINGS_TO_TEST_IN_SORT_ORDER).map(PrereleaseIdentifier::valueOf)
         .toArray(PrereleaseIdentifier[]::new));
   }
+
   @Test
   public void testWithEqualsVerifier() {
     EqualsVerifier.forRelaxedEqualExamples(
@@ -28,6 +29,7 @@ class PrereleaseIdentifierTest {
             new PrereleaseIdentifier(false, 1, "bar"))
         .verify();
   }
+
   @Test
   public void testToString() {
     for (String chunkString : CHUNK_STRINGS_TO_TEST_IN_SORT_ORDER) {

@@ -12,7 +12,7 @@ import java.util.Objects;
  * The &lt;pre-release identifier&gt; element of the BNF specification at
  * https://semver.org/#backusnaur-form-grammar-for-valid-semver-versions.
  */
-record PrereleaseIdentifier(boolean hasNumericPart, long numericPartUnsignedUnboxed, String suffix)
+record PrereleaseIdentifier(boolean hasNumericPart, long numericPartAsLongBits, String suffix)
     implements Comparable<PrereleaseIdentifier>, Serializable {
 
   public static final PrereleaseIdentifier MIN_VALUE = new PrereleaseIdentifier(true, 0, "");
@@ -28,7 +28,7 @@ record PrereleaseIdentifier(boolean hasNumericPart, long numericPartUnsignedUnbo
         return 1; // Numeric comes first
       }
     } else {
-      int result = UnsignedLongs.compare(this.numericPartUnsignedUnboxed(), other.numericPartUnsignedUnboxed());
+      int result = UnsignedLongs.compare(this.numericPartAsLongBits(), other.numericPartAsLongBits());
       if (result != 0) {
         return result;
       }
@@ -61,7 +61,7 @@ record PrereleaseIdentifier(boolean hasNumericPart, long numericPartUnsignedUnbo
     if (!hasNumericPart) {
       return suffix;
     }
-    return UnsignedLongs.toString(numericPartUnsignedUnboxed) + suffix;
+    return UnsignedLongs.toString(numericPartAsLongBits) + suffix;
   }
 
   @Override
@@ -76,16 +76,16 @@ record PrereleaseIdentifier(boolean hasNumericPart, long numericPartUnsignedUnbo
     if (!Objects.equals(suffix, that.suffix) || hasNumericPart != that.hasNumericPart) {
       return false;
     }
-    return !hasNumericPart || numericPartUnsignedUnboxed == that.numericPartUnsignedUnboxed;
+    return !hasNumericPart || numericPartAsLongBits == that.numericPartAsLongBits;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(hasNumericPart ? numericPartUnsignedUnboxed : -1, suffix);
+    return Objects.hash(hasNumericPart ? numericPartAsLongBits : -1, suffix);
   }
 
   @Nullable
   public UnsignedLong numericPart() {
-    return hasNumericPart() ? UnsignedLong.fromLongBits(numericPartUnsignedUnboxed()) : null;
+    return hasNumericPart() ? UnsignedLong.fromLongBits(numericPartAsLongBits()) : null;
   }
 }
