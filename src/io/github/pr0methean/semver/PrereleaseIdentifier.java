@@ -1,23 +1,21 @@
 package io.github.pr0methean.semver;
 
-import com.google.common.primitives.UnsignedLong;
-import com.google.common.primitives.UnsignedLongs;
+import org.checkerframework.checker.signedness.qual.Unsigned;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.util.Objects;
+import java.util.OptionalLong;
 
 /**
  * The &lt;pre-release identifier&gt; element of the BNF specification at
  * https://semver.org/#backusnaur-form-grammar-for-valid-semver-versions.
  */
-record PrereleaseIdentifier(boolean hasNumericPart, long numericPartAsLongBits, String suffix)
+record PrereleaseIdentifier(boolean hasNumericPart, @Unsigned long numericPart, String suffix)
     implements Comparable<PrereleaseIdentifier>, Serializable {
 
   public static final PrereleaseIdentifier MIN_VALUE = new PrereleaseIdentifier(true, 0, "");
 
-  @SuppressWarnings("UnstableApiUsage")
   @Override
   public int compareTo(@Nonnull PrereleaseIdentifier other) {
     if (hasNumericPart() && !other.hasNumericPart()) {
@@ -28,7 +26,7 @@ record PrereleaseIdentifier(boolean hasNumericPart, long numericPartAsLongBits, 
         return 1; // Numeric comes first
       }
     } else {
-      int result = UnsignedLongs.compare(this.numericPartAsLongBits(), other.numericPartAsLongBits());
+      int result = Long.compareUnsigned(numericPart, other.numericPart);
       if (result != 0) {
         return result;
       }
@@ -36,7 +34,6 @@ record PrereleaseIdentifier(boolean hasNumericPart, long numericPartAsLongBits, 
     return suffix().compareTo(other.suffix());
   }
 
-  @SuppressWarnings("UnstableApiUsage")
   public static PrereleaseIdentifier valueOf(String input) {
     if (input.isEmpty()) {
       throw new IllegalArgumentException("Can't create an empty chunk");
@@ -51,17 +48,16 @@ record PrereleaseIdentifier(boolean hasNumericPart, long numericPartAsLongBits, 
     }
     int[] suffixPart = input.codePoints().skip(numericLength).toArray();
     return new PrereleaseIdentifier(true,
-        UnsignedLongs.parseUnsignedLong(new String(numericPart, 0, numericLength)),
+        Long.parseUnsignedLong(new String(numericPart, 0, numericLength)),
         new String(suffixPart, 0, suffixPart.length));
   }
 
-  @SuppressWarnings("UnstableApiUsage")
   @Override
   public String toString() {
     if (!hasNumericPart) {
       return suffix;
     }
-    return UnsignedLongs.toString(numericPartAsLongBits) + suffix;
+    return Long.toUnsignedString(numericPart) + suffix;
   }
 
   @Override
@@ -76,16 +72,16 @@ record PrereleaseIdentifier(boolean hasNumericPart, long numericPartAsLongBits, 
     if (!Objects.equals(suffix, that.suffix) || hasNumericPart != that.hasNumericPart) {
       return false;
     }
-    return !hasNumericPart || numericPartAsLongBits == that.numericPartAsLongBits;
+    return !hasNumericPart || numericPart == that.numericPart;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(hasNumericPart ? numericPartAsLongBits : -1, suffix);
+    return Objects.hash(hasNumericPart ? numericPart : -1, suffix);
   }
 
-  @Nullable
-  public UnsignedLong numericPart() {
-    return hasNumericPart() ? UnsignedLong.fromLongBits(numericPartAsLongBits()) : null;
+  @Unsigned
+  public OptionalLong numericPartIfPresent() {
+    return hasNumericPart() ? OptionalLong.of(numericPart) : OptionalLong.empty();
   }
 }

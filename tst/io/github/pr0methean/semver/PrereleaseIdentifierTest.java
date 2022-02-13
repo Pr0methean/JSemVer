@@ -5,6 +5,8 @@ import nl.jqno.equalsverifier.EqualsVerifier;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 import static io.github.pr0methean.semver.PrereleaseIdentifier.valueOf;
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,7 +43,8 @@ class PrereleaseIdentifierTest {
   public void testExtractPartsNumericAndSuffix() {
     PrereleaseIdentifier chunk = PrereleaseIdentifier.valueOf("123a");
     assertTrue(chunk.hasNumericPart());
-    assertEquals(UnsignedLong.valueOf(123), chunk.numericPart());
+    assertEquals(123, chunk.numericPart());
+    assertEquals(OptionalLong.of(123), chunk.numericPartIfPresent());
     assertEquals("a", chunk.suffix());
   }
 
@@ -49,7 +52,8 @@ class PrereleaseIdentifierTest {
   public void testExtractPartsNumericOnly() {
     PrereleaseIdentifier chunk = PrereleaseIdentifier.valueOf("123");
     assertTrue(chunk.hasNumericPart());
-    assertEquals(UnsignedLong.valueOf(123), chunk.numericPart());
+    assertEquals(123, chunk.numericPart());
+    assertEquals(OptionalLong.of(123), chunk.numericPartIfPresent());
     assertEquals("", chunk.suffix());
   }
 
@@ -57,7 +61,7 @@ class PrereleaseIdentifierTest {
   public void testExtractPartsSuffixOnly() {
     PrereleaseIdentifier chunk = PrereleaseIdentifier.valueOf("a");
     assertFalse(chunk.hasNumericPart());
-    assertNull(chunk.numericPart());
+    assertEquals(OptionalLong.empty(), chunk.numericPartIfPresent());
     assertEquals("a", chunk.suffix());
   }
 

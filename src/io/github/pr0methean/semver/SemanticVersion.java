@@ -2,6 +2,7 @@ package io.github.pr0methean.semver;
 
 import com.google.common.collect.Comparators;
 import com.google.common.primitives.UnsignedLong;
+import org.checkerframework.checker.signedness.qual.Unsigned;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -10,7 +11,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
-import static com.google.common.primitives.UnsignedLong.fromLongBits;
 import static io.github.pr0methean.semver.SemanticVersionImpl.comparingUnsignedLong;
 import static io.github.pr0methean.semver.SemanticVersionImpl.parsePrereleaseVersion;
 import static java.util.Comparator.comparing;
@@ -18,9 +18,9 @@ import static java.util.Comparator.naturalOrder;
 import static java.util.Comparator.nullsFirst;
 
 public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable, Serializable {
-  long UNSIGNED_MAX_VALUE_UNBOXED = UnsignedLong.MAX_VALUE.longValue();
-  SemanticVersion MAX_VALUE = new SemanticVersionImpl(UNSIGNED_MAX_VALUE_UNBOXED, UNSIGNED_MAX_VALUE_UNBOXED,
-      UNSIGNED_MAX_VALUE_UNBOXED, null, null);
+  long UNSIGNED_MAX_VALUE = -1;
+  SemanticVersion MAX_VALUE = new SemanticVersionImpl(UNSIGNED_MAX_VALUE, UNSIGNED_MAX_VALUE,
+      UNSIGNED_MAX_VALUE, null, null);
   SemanticVersion MIN_VALUE = new SemanticVersionImpl(0, 0, 0,
       new PrereleaseIdentifier[]{PrereleaseIdentifier.MIN_VALUE}, null);
 
@@ -31,9 +31,9 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
    * vice-versa). See {@link #TOTAL_ORDERING} for an ordering that distinguishes versions with different build metadata.
    */
   Comparator<SemanticVersion> BUILD_METADATA_AGNOSTIC_COMPARATOR
-          = comparingUnsignedLong(SemanticVersion::majorVersionAsLongBits)
-      .thenComparing(comparingUnsignedLong(SemanticVersion::minorVersionAsLongBits))
-      .thenComparing(comparingUnsignedLong(SemanticVersion::patchVersionAsLongBits))
+          = comparingUnsignedLong(SemanticVersion::majorVersion)
+      .thenComparing(comparingUnsignedLong(SemanticVersion::minorVersion))
+      .thenComparing(comparingUnsignedLong(SemanticVersion::patchVersion))
       .thenComparing(SemanticVersion::comparePrereleaseVersions);
 
   /**
@@ -99,7 +99,7 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
       }
     } else {
       if (mainChunkStrings.length != 3) {
-        throw new IllegalArgumentException("Must be major.minor.patch");
+        throw new IllegalArgumentException(input + " is an invalid semantic version: must be major.minor.patch");
       }
     }
     long[] mainChunks = Arrays.stream(mainChunkStrings)
@@ -122,14 +122,14 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
     return new SemanticVersionImpl(unsignedMajor, unsignedMinor, unsignedPatch, prereleaseChunks, buildMetadata);
   }
 
-  static SemanticVersion valueOf(UnsignedLong major, UnsignedLong minor, UnsignedLong patch,
+  static SemanticVersion valueOf(@Unsigned long major, @Unsigned long minor, @Unsigned long patch,
       List<String> prereleaseIdentifiers, @Nullable String buildMetadata) {
     PrereleaseIdentifier[] prereleaseIdentifiersArray = null;
     if (prereleaseIdentifiers != null && !prereleaseIdentifiers.isEmpty()) {
       prereleaseIdentifiersArray =
           prereleaseIdentifiers.stream().map(PrereleaseIdentifier::valueOf).toArray(PrereleaseIdentifier[]::new);
     }
-    return new SemanticVersionImpl(major.longValue(), minor.longValue(), patch.longValue(), prereleaseIdentifiersArray,
+    return new SemanticVersionImpl(major, minor, patch, prereleaseIdentifiersArray,
         ((buildMetadata != null && buildMetadata.isEmpty()) ? null : buildMetadata));
   }
 
@@ -162,19 +162,22 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
   SemanticVersion clone();
 
   /**
-   * Equivalent to {@link #majorVersion()}{@code .longValue()} but may avoid boxing and unboxing.
+   * @return the major version of this semantic version (e.g. returns 1 for version 1.2.0)
    */
-  long majorVersionAsLongBits();
+  @Unsigned
+  long majorVersion();
 
   /**
-   * Equivalent to {@link #minorVersion()}{@code .longValue()} but may avoid boxing and unboxing.
+   * @return the minor version of this semantic version (e.g. returns 2 for version 1.2.0)
    */
-  long minorVersionAsLongBits();
+  @Unsigned
+  long minorVersion();
 
   /**
-   * Equivalent to {@link #patchVersion()}{@code .longValue()} but may avoid boxing and unboxing.
+   * @return the patch version of this semantic version (e.g. returns 0 for version 1.2.0)
    */
-  long patchVersionAsLongBits();
+  @Unsigned
+  long patchVersion();
 
   @Nullable String buildMetadata();
 
@@ -192,27 +195,6 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
       return Arrays.compare(impl1.prereleaseVersionArray(), impl2.prereleaseVersionArray());
     }
     return COMPARATOR_FOR_UNKNOWN_PRERELEASE_IDENTIFIER_IMPLS.compare(v1.prereleaseVersion(), v2.prereleaseVersion());
-  }
-
-  /**
-   * @return the major version of this semantic version (e.g. returns 1 for version 1.2.0)
-   */
-  default UnsignedLong majorVersion() {
-    return fromLongBits(majorVersionAsLongBits());
-  }
-
-  /**
-   * @return the minor version of this semantic version (e.g. returns 2 for version 1.2.0)
-   */
-  default UnsignedLong minorVersion() {
-    return fromLongBits(minorVersionAsLongBits());
-  }
-
-  /**
-   * @return the patch version of this semantic version (e.g. returns 0 for version 1.2.0)
-   */
-  default UnsignedLong patchVersion() {
-    return fromLongBits(patchVersionAsLongBits());
   }
 
   /**
