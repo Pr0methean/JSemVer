@@ -11,9 +11,6 @@ import java.util.stream.Stream;
 
 import org.checkerframework.checker.signedness.qual.Unsigned;
 
-/**
- * Represents a semantic version complying with https://semver.org/spec/v1.0.0.html.
- */
 record SemanticVersionImpl(
     @Unsigned long majorVersion,
     @Unsigned long minorVersion,
@@ -114,7 +111,7 @@ record SemanticVersionImpl(
   }
 
   @Override
-  public SemanticVersion prereleaseWithIdentifiers(List<String> identifiers) {
+  public SemanticVersion prereleaseWithIdentifiers(@Nullable List<String> identifiers) {
     if (identifiers == null || identifiers.isEmpty()) {
       return releaseVersion();
     }
@@ -166,7 +163,7 @@ record SemanticVersionImpl(
         patchVersion + 1, null, null);
   }
 
-  private SemanticVersionImpl prereleaseWithIdentifiers(PrereleaseIdentifier[] identifiers) {
+  private SemanticVersionImpl prereleaseWithIdentifiers(@Nullable PrereleaseIdentifier[] identifiers) {
     return new SemanticVersionImpl(
         majorVersion,
         minorVersion,

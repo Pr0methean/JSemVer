@@ -2,7 +2,6 @@ package io.github.pr0methean.semver;
 
 import org.checkerframework.checker.signedness.qual.Unsigned;
 
-import javax.annotation.Nonnull;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -17,7 +16,7 @@ record PrereleaseIdentifier(boolean hasNumericPart, @Unsigned long numericPart, 
   public static final PrereleaseIdentifier MIN_VALUE = new PrereleaseIdentifier(true, 0, "");
 
   @Override
-  public int compareTo(@Nonnull PrereleaseIdentifier other) {
+  public int compareTo(PrereleaseIdentifier other) {
     if (hasNumericPart() && !other.hasNumericPart()) {
       return -1; // Numeric comes first
     }
