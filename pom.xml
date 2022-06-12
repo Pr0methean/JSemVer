@@ -20,6 +20,7 @@
         <developerConnection>scm:git:https://github.com/Pr0methean/JSemVer.git</developerConnection>
         <connection>scm:git:https://github.com/Pr0methean/JSemVer.git</connection>
         <url>git@github.com:https://github.com/Pr0methean/JSemVer.git</url>
+        <tag>main</tag>
     </scm>
 
     <build>
