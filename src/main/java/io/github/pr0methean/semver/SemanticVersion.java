@@ -15,6 +15,9 @@ import static io.github.pr0methean.semver.SemanticVersionImpl.parsePrereleaseVer
 import static java.util.Comparator.naturalOrder;
 import static java.util.Comparator.nullsFirst;
 
+/**
+ * A semantic version as defined at <a href="https://semver.org/spec/v2.0.0.html">semver.org</a>.
+ */
 public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable, Serializable {
 
   long UNSIGNED_MAX_VALUE = -1;
