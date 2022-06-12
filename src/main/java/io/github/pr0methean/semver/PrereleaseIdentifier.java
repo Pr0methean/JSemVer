@@ -8,7 +8,7 @@ import java.util.OptionalLong;
 
 /**
  * The &lt;pre-release identifier&gt; element of the BNF specification at
- * https://semver.org/#backusnaur-form-grammar-for-valid-semver-versions.
+ * <a href="https://semver.org/#backusnaur-form-grammar-for-valid-semver-versions">semver.org</a>.
  */
 record PrereleaseIdentifier(boolean hasNumericPart, @Unsigned long numericPart, String suffix)
     implements Comparable<PrereleaseIdentifier>, Serializable {
