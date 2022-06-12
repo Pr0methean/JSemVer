@@ -32,6 +32,10 @@ jobs:
     - name: Build with Maven
       run: mvn -B package --file pom.xml
 
+    - name: Promote to Release
+      if: github.event_name == 'release'
+      run: mvn promote:prepare release:prepare
+
     - name: Publish to GitHub Packages Apache Maven
       run: mvn deploy -s $GITHUB_WORKSPACE/settings.xml
       env:
