@@ -16,10 +16,6 @@
         </repository>
     </distributionManagement>
 
-    <scm>
-        <developerConnection>scm:git:https://github.com/Pr0methean/JSemVer.git</developerConnection>
-    </scm>
-
     <build>
         <plugins>
             <plugin>
