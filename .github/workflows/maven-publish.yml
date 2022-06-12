@@ -5,7 +5,7 @@ name: Maven Package
 
 on:
   release:
-    types: [created]
+    types: [published]
   push:
     branches: ["*"]
   pull_request:
@@ -41,7 +41,7 @@ jobs:
       run: |
         git config --global user.email "actions@github.com"
         git config --global user.name "🤖 GitHub Actions"
-        mvn -X release:prepare
+        mvn -X release:prepare -D scm.tag={{github.ref}}
 
     - name: Publish to GitHub Packages Apache Maven
       run: mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml
