@@ -86,6 +86,6 @@
         <checkerframework.version>3.22.1</checkerframework.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <jsemver.version>1.0-SNAPSHOT</jsemver.version>
+        <jsemver.version>1.0.0-SNAPSHOT</jsemver.version>
     </properties>
 </project>
