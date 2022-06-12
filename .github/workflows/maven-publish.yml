@@ -41,7 +41,7 @@ jobs:
       run: |
         git config --global user.email "actions@github.com"
         git config --global user.name "🤖 GitHub Actions"
-        mvn -X release:prepare -Dtag=HEAD -DreleaseVersion=${{ github.event.release.tag_name }}
+        mvn -X release:prepare -Dtag=main -DreleaseVersion=${{ github.event.release.tag_name }}
     - name: Publish to GitHub Packages Apache Maven
       run: mvn -B deploy -s $GITHUB_WORKSPACE/settings.xml
       env:
