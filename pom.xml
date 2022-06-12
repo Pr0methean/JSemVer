@@ -16,6 +16,13 @@
         </repository>
     </distributionManagement>
 
+    <scm>
+        <developerConnection>scm:git:https://github.com/Pr0methean/JSemVer.git</developerConnection>
+        <connection>scm:git:https://github.com/Pr0methean/JSemVer.git</connection>
+        <url>git@github.com:https://github.com/Pr0methean/JSemVer.git</url>
+        <tag>HEAD</tag>
+    </scm>
+
     <build>
         <plugins>
             <plugin>
