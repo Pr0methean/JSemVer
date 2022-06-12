@@ -8,6 +8,14 @@
     <artifactId>jsemver</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Pr0methean Apache Maven Packages</name>
+            <url>https://maven.pkg.github.com/Pr0methean/JSemVer</url>
+        </repository>
+    </distributionManagement>
+
     <dependencies>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
