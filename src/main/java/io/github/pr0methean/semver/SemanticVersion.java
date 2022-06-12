@@ -1,7 +1,5 @@
 package io.github.pr0methean.semver;
 
-import com.google.common.collect.Comparators;
-import com.google.common.primitives.UnsignedLong;
 import org.checkerframework.checker.signedness.qual.Unsigned;
 
 import javax.annotation.Nonnull;
@@ -9,15 +7,16 @@ import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 
 import static io.github.pr0methean.semver.SemanticVersionImpl.comparingUnsignedLong;
 import static io.github.pr0methean.semver.SemanticVersionImpl.parsePrereleaseVersion;
-import static java.util.Comparator.comparing;
 import static java.util.Comparator.naturalOrder;
 import static java.util.Comparator.nullsFirst;
 
 public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable, Serializable {
+
   long UNSIGNED_MAX_VALUE = -1;
   SemanticVersion MAX_VALUE = new SemanticVersionImpl(UNSIGNED_MAX_VALUE, UNSIGNED_MAX_VALUE,
       UNSIGNED_MAX_VALUE, null, null);
@@ -42,16 +41,13 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
    */
   Comparator<SemanticVersion> TOTAL_ORDERING
           = BUILD_METADATA_AGNOSTIC_COMPARATOR.thenComparing(SemanticVersion::buildMetadata, nullsFirst(naturalOrder()));
-  @SuppressWarnings({"UnstableApiUsage"})
-  Comparator<Iterable<String>> COMPARATOR_FOR_UNKNOWN_PRERELEASE_IDENTIFIER_IMPLS
-      = Comparators.lexicographical(comparing(PrereleaseIdentifier::valueOf));
 
   /**
    * Converts the given String to a SemanticVersion.
    * @param input the string to convert
    * @return the equivalent SemanticVersion instance
    * @throws NumberFormatException if the major, minor and patch versions are not all integers between 0 and
-   *     {@link UnsignedLong#MAX_VALUE} inclusive
+   *     {@link Long#MAX_VALUE} inclusive
    * @throws IllegalArgumentException if {@code input} isn't a valid SemanticVersion according to the standard, for any
    *     other reason
    */
@@ -194,7 +190,26 @@ public interface SemanticVersion extends Comparable<SemanticVersion>, Cloneable,
     if (v1 instanceof SemanticVersionImpl impl1 && v2 instanceof SemanticVersionImpl impl2) {
       return Arrays.compare(impl1.prereleaseVersionArray(), impl2.prereleaseVersionArray());
     }
-    return COMPARATOR_FOR_UNKNOWN_PRERELEASE_IDENTIFIER_IMPLS.compare(v1.prereleaseVersion(), v2.prereleaseVersion());
+    final Iterator<String> iterator1 = v1.prereleaseVersion().iterator();
+    final Iterator<String> iterator2 = v2.prereleaseVersion().iterator();
+    while (true) {
+      if (iterator1.hasNext()) {
+        if (iterator2.hasNext()) {
+          PrereleaseIdentifier prerel1 = PrereleaseIdentifier.valueOf(iterator1.next());
+          PrereleaseIdentifier prerel2 = PrereleaseIdentifier.valueOf(iterator2.next());
+          int comparison = prerel1.compareTo(prerel2);
+          if (comparison != 0) {
+            return comparison;
+          }
+        } else {
+          return 1; // Sort prerelease identifier lists lexicographically
+        }
+      } else if (iterator2.hasNext()) {
+        return -1; // Sort prerelease identifier lists lexicographically
+      } else {
+        return 0;
+      }
+    }
   }
 
   /**

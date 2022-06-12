@@ -1,17 +1,15 @@
 package io.github.pr0methean.semver;
 
-import com.google.common.primitives.UnsignedLong;
 import nl.jqno.equalsverifier.EqualsVerifier;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.OptionalLong;
 
 import static io.github.pr0methean.semver.PrereleaseIdentifier.valueOf;
 import static org.junit.jupiter.api.Assertions.*;
 
-class PrereleaseIdentifierTest {
+public class PrereleaseIdentifierTest {
   private static final String[] CHUNK_STRINGS_TO_TEST_IN_SORT_ORDER = {"1","2","2a","10","alpha","beta"};
   @Test
   public void testEqualsAndCompareTo() {

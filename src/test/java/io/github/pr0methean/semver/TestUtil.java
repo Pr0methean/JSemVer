@@ -1,7 +1,6 @@
 package io.github.pr0methean.semver;
 
 import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
 
 import static org.junit.jupiter.api.Assertions.*;
 
